@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from pathlib import Path
 import pygame
 
 from entities.entity import Entity
@@ -27,6 +28,11 @@ from utils.constants import (
 class Boss(Entity):
     """Boss central da arena com progressao continua e cura em fases."""
 
+    SPRITE_FRAME_COUNT = 10
+    SPRITE_FRAME_DURATION = 0.09
+    SPRITE_DRAW_SIZE = (150, 150)
+    SPRITE_SHEET_PATH = Path(__file__).resolve().parent.parent / "assets" / "boss_sheet.png"
+
     def __init__(self, x: float, y: float) -> None:
         super().__init__(x, y, 90, 90, max_hp=220)
         self.float_origin_x = x
@@ -43,9 +49,13 @@ class Boss(Entity):
         self.phase = 1
         self.ult_damage = BOSS_ULT_DAMAGE
         self.minion_spawn_timer = 4.0
+        self.animation_timer = 0.0
+        self.current_frame = 0
+        self.sprite_frames = self._load_sprite_frames()
 
     def update(self, dt: float, player: Entity) -> None:
         """Atualiza timers e movimento, exceto durante a pausa de cura."""
+        self._update_animation(dt)
         self.heal_pause_timer = max(0.0, self.heal_pause_timer - dt)
 
         if self.heal_pause_timer > 0:
@@ -61,12 +71,19 @@ class Boss(Entity):
 
     def draw(self, screen: pygame.Surface) -> None:
         """Desenha o boss e um brilho quando ele esta se recuperando."""
-        pygame.draw.ellipse(screen, BOSS_COLOR, self.rect)
+        if self.sprite_frames:
+            frame = self.sprite_frames[self.current_frame]
+            sprite_rect = frame.get_rect(center=self.rect.center)
+            screen.blit(frame, sprite_rect)
+        else:
+            pygame.draw.ellipse(screen, BOSS_COLOR, self.rect)
 
         if self.heal_pause_timer > 0:
-            overlay = pygame.Surface(self.rect.size, pygame.SRCALPHA)
+            overlay_size = self.sprite_frames[0].get_size() if self.sprite_frames else self.rect.size
+            overlay = pygame.Surface(overlay_size, pygame.SRCALPHA)
             overlay.fill((255, 255, 255, 85))
-            screen.blit(overlay, self.rect.topleft)
+            overlay_rect = overlay.get_rect(center=self.rect.center)
+            screen.blit(overlay, overlay_rect)
 
     def is_healing(self) -> bool:
         """Indica se o boss esta travado na pausa de cura."""
@@ -205,3 +222,30 @@ class Boss(Entity):
         self.projectile_damage += 2
         self.ult_damage += 2
         self.attack_cooldown = max(0.45, self.attack_cooldown - 0.05)
+
+    def _load_sprite_frames(self) -> list[pygame.Surface]:
+        """Carrega e fatia o spritesheet do boss quando o asset estiver disponivel."""
+        if not self.SPRITE_SHEET_PATH.exists():
+            return []
+
+        sheet = pygame.image.load(str(self.SPRITE_SHEET_PATH)).convert_alpha()
+        frame_width = sheet.get_width() // self.SPRITE_FRAME_COUNT
+        frame_height = sheet.get_height()
+        frames: list[pygame.Surface] = []
+
+        for index in range(self.SPRITE_FRAME_COUNT):
+            frame = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA)
+            frame.blit(sheet, (0, 0), pygame.Rect(index * frame_width, 0, frame_width, frame_height))
+            frames.append(pygame.transform.scale(frame, self.SPRITE_DRAW_SIZE))
+
+        return frames
+
+    def _update_animation(self, dt: float) -> None:
+        """Avanca a animacao do boss em loop enquanto o jogo roda."""
+        if not self.sprite_frames:
+            return
+
+        self.animation_timer += dt
+        while self.animation_timer >= self.SPRITE_FRAME_DURATION:
+            self.animation_timer -= self.SPRITE_FRAME_DURATION
+            self.current_frame = (self.current_frame + 1) % len(self.sprite_frames)

@@ -1,5 +1,7 @@
 """Loop principal e orquestracao de todos os sistemas do jogo."""
 
+from pathlib import Path
+
 import pygame
 
 from entities.aerial_minion import AerialMinion
@@ -25,6 +27,8 @@ from utils.constants import (
 class Game:
     """Coordena estado, entidades, combate e transicoes de tela."""
 
+    BACKGROUND_PATH = Path(__file__).resolve().parent / "assets" / "background.png"
+
     def __init__(self) -> None:
         pygame.init()
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -32,6 +36,7 @@ class Game:
         self.clock = pygame.time.Clock()
         self.running = True
         self.hud = Hud()
+        self.background = self.load_background()
         self.upgrade_options = [
             ("1", "Aumentar dano do tiro", "+4 de dano por disparo"),
             ("2", "Reduzir cooldown do tiro", "-0.05s entre disparos"),
@@ -55,6 +60,14 @@ class Game:
         self.survival_time = 0.0
         self.scale_timer = 0.0
         self.ground_minion_spawn_timer = 3.5
+
+    def load_background(self) -> pygame.Surface | None:
+        """Carrega o fundo da arena quando houver asset configurado."""
+        if not self.BACKGROUND_PATH.exists():
+            return None
+
+        background = pygame.image.load(str(self.BACKGROUND_PATH)).convert()
+        return pygame.transform.scale(background, (WIDTH, HEIGHT))
 
     def run(self) -> None:
         """Executa o loop principal enquanto a janela estiver aberta."""
@@ -287,7 +300,11 @@ class Game:
 
     def draw(self) -> None:
         """Desenha cena, inimigos, efeitos e HUD na ordem correta."""
-        self.screen.fill(BACKGROUND_COLOR)
+        if self.background:
+            self.screen.blit(self.background, (0, 0))
+        else:
+            self.screen.fill(BACKGROUND_COLOR)
+
         self.player.draw(self.screen)
         self.boss.draw(self.screen)
         self.boss.draw_telegraph(self.screen, self.player)
