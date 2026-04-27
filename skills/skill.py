@@ -4,9 +4,14 @@ from abc import ABC, abstractmethod
 
 
 class Skill(ABC):
-    """Contrato minimo para skills com recarga."""
+    """Contrato minimo para skills com recarga.
+
+    A classe base isola o conceito de cooldown para que cada skill concreta
+    precise implementar apenas sua regra de ativacao.
+    """
 
     def __init__(self, cooldown: float) -> None:
+        """Inicializa cooldown total e o timer atual."""
         self.cooldown = cooldown
         self.cooldown_timer = 0.0
 

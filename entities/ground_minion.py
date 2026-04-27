@@ -20,6 +20,7 @@ class GroundMinion(Entity):
     SPRITE_DRAW_SIZE = (72, 72)
 
     def __init__(self, from_left: bool, phase: int) -> None:
+        """Inicializa lado de entrada, velocidade e animacao do minion."""
         width = 34
         height = 46
         x = -width if from_left else WIDTH + width

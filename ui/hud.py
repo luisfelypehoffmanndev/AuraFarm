@@ -8,11 +8,22 @@ from utils.constants import HEIGHT, HUD_TEXT_COLOR, RED, WHITE, WIDTH
 
 
 class Hud:
-    """Desenha barras, overlays e interacoes visuais da interface."""
+    """Desenha barras, overlays e interacoes visuais da interface.
+
+    A HUD nao altera o estado do jogo por conta propria. Ela apenas apresenta
+    informacao e ajuda o ``Game`` a interpretar cliques no menu de upgrade.
+    """
 
     def __init__(self) -> None:
+        """Inicializa fontes e valores suavizados usados na interface."""
         self.font = pygame.font.SysFont("consolas", 18)
         self.small_font = pygame.font.SysFont("consolas", 14)
+        self.large_font = pygame.font.SysFont("consolas", 34, bold=True)
+        self.display_player_hp_ratio = 1.0
+        self.display_boss_hp_ratio = 1.0
+        self.player_damage_ratio = 1.0
+        self.boss_damage_ratio = 1.0
+        self.display_aura_ratio = 0.0
 
     def draw(
         self,
@@ -22,8 +33,10 @@ class Hud:
         survival_time: float,
         state: str,
         upgrade_options: list[tuple[str, str, str]],
+        dt: float,
     ) -> None:
         """Desenha a HUD persistente e os overlays dependentes de estado."""
+        self.update_animated_values(player, boss, dt)
         self.draw_boss_bar(screen, boss)
         self.draw_status_panel(screen, player, survival_time)
 
@@ -33,8 +46,40 @@ class Hud:
         if state == "game_over":
             self.draw_game_over(screen, survival_time)
 
+    def update_animated_values(self, player: Player, boss: Boss, dt: float) -> None:
+        """Interpola valores exibidos para evitar saltos secos nas barras.
+
+        A HUD mostra valores filtrados visualmente, mas o gameplay continua
+        usando os numeros reais guardados em ``player`` e ``boss``.
+        """
+        player_hp_ratio = player.hp / player.max_hp if player.max_hp else 0
+        boss_hp_ratio = boss.hp / boss.max_hp if boss.max_hp else 0
+        aura_ratio = player.aura / player.max_aura if player.max_aura else 0
+
+        self.display_player_hp_ratio = self.smooth_to(self.display_player_hp_ratio, player_hp_ratio, dt, 10.0)
+        self.display_boss_hp_ratio = self.smooth_to(self.display_boss_hp_ratio, boss_hp_ratio, dt, 8.0)
+        self.display_aura_ratio = self.smooth_to(self.display_aura_ratio, aura_ratio, dt, 9.0)
+
+        if player_hp_ratio > self.player_damage_ratio:
+            self.player_damage_ratio = player_hp_ratio
+        else:
+            self.player_damage_ratio = self.smooth_to(self.player_damage_ratio, player_hp_ratio, dt, 3.0)
+
+        if boss_hp_ratio > self.boss_damage_ratio:
+            self.boss_damage_ratio = boss_hp_ratio
+        else:
+            self.boss_damage_ratio = self.smooth_to(self.boss_damage_ratio, boss_hp_ratio, dt, 2.6)
+
+    def smooth_to(self, current: float, target: float, dt: float, speed: float) -> float:
+        """Move um valor em direcao ao alvo com suavizacao independente do FPS."""
+        if abs(current - target) < 0.001:
+            return target
+
+        factor = min(1.0, dt * speed)
+        return current + (target - current) * factor
+
     def draw_boss_bar(self, screen: pygame.Surface, boss: Boss) -> None:
-        """Barra de vida superior do boss e indicador de recuperacao."""
+        """Desenha a barra de vida superior do boss e o estado de cura."""
         panel_width = 360
         panel_height = 34
         panel_x = (WIDTH - panel_width) // 2
@@ -51,15 +96,23 @@ class Hud:
         bar_y = panel_y + 11
         bar_width = 286
         pygame.draw.rect(screen, WHITE, (bar_x, bar_y, bar_width, 12), 1)
-        ratio = boss.hp / boss.max_hp if boss.max_hp else 0
-        pygame.draw.rect(screen, RED, (bar_x + 2, bar_y + 2, int((bar_width - 4) * ratio), 8))
+        self.draw_animated_bar(
+            screen,
+            bar_x + 2,
+            bar_y + 2,
+            bar_width - 4,
+            8,
+            self.display_boss_hp_ratio,
+            self.boss_damage_ratio,
+            RED,
+        )
 
         if boss.is_healing():
             text = self.small_font.render(f"RECUPERANDO {boss.heal_pause_timer:0.1f}s", True, (255, 230, 170))
             screen.blit(text, (panel_x + panel_width + 12, panel_y + 9))
 
     def draw_status_panel(self, screen: pygame.Surface, player: Player, survival_time: float) -> None:
-        """Painel inferior com tempo, HP e aura do player."""
+        """Desenha o painel inferior com tempo, HP e aura do player."""
         panel_width = 520
         panel_height = 56
         panel_x = 24
@@ -80,8 +133,16 @@ class Hud:
         bar_x = panel_x + 190
         bar_y = panel_y + 17
         pygame.draw.rect(screen, WHITE, (bar_x, bar_y, 118, 12), 1)
-        ratio = player.hp / player.max_hp if player.max_hp else 0
-        pygame.draw.rect(screen, RED, (bar_x + 2, bar_y + 2, int(114 * ratio), 8))
+        self.draw_animated_bar(
+            screen,
+            bar_x + 2,
+            bar_y + 2,
+            114,
+            8,
+            self.display_player_hp_ratio,
+            self.player_damage_ratio,
+            RED,
+        )
 
         label = self.small_font.render("HP", True, WHITE)
         screen.blit(label, (bar_x - 28, bar_y - 2))
@@ -91,11 +152,42 @@ class Hud:
         bar_x = panel_x + 360
         bar_y = panel_y + 17
         pygame.draw.rect(screen, WHITE, (bar_x, bar_y, 118, 12), 1)
-        ratio = player.aura / player.max_aura if player.max_aura else 0
-        pygame.draw.rect(screen, (80, 160, 255), (bar_x + 2, bar_y + 2, int(114 * ratio), 8))
+        pygame.draw.rect(screen, (80, 160, 255), (bar_x + 2, bar_y + 2, int(114 * self.display_aura_ratio), 8))
 
         label = self.small_font.render("AURA", True, WHITE)
         screen.blit(label, (bar_x - 48, bar_y - 2))
+
+    def draw_animated_bar(
+        self,
+        screen: pygame.Surface,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+        fill_ratio: float,
+        damage_ratio: float,
+        color: tuple[int, int, int],
+    ) -> None:
+        """Desenha barra principal com rastro atrasado de dano/recuperacao.
+
+        O rastro mais lento ajuda o jogador a perceber impactos e recuperacoes
+        sem depender apenas de numeros.
+        """
+        fill_ratio = max(0.0, min(1.0, fill_ratio))
+        damage_ratio = max(0.0, min(1.0, damage_ratio))
+
+        damage_width = int(width * damage_ratio)
+        fill_width = int(width * fill_ratio)
+
+        if damage_width > fill_width:
+            pygame.draw.rect(screen, (255, 210, 110), (x, y, damage_width, height))
+
+        pygame.draw.rect(screen, color, (x, y, fill_width, height))
+
+        highlight_width = max(0, fill_width - 2)
+        if highlight_width > 0:
+            highlight = tuple(min(255, channel + 35) for channel in color)
+            pygame.draw.rect(screen, highlight, (x + 1, y + 1, highlight_width, 2))
 
     def draw_game_over(self, screen: pygame.Surface, survival_time: float) -> None:
         """Overlay simples de fim de jogo."""
@@ -103,16 +195,18 @@ class Hud:
         overlay.fill((0, 0, 0, 170))
         screen.blit(overlay, (0, 0))
 
-        title = self.font.render("Game Over", True, WHITE)
+        title = self.small_font.render("Game Over", True, WHITE)
+        message = self.large_font.render("Nao sobrou nada...", True, RED)
         subtitle = self.small_font.render(f"Sobreviveu por {survival_time:05.1f}s", True, WHITE)
         hint = self.small_font.render("Pressione R para reiniciar", True, WHITE)
 
-        screen.blit(title, title.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 10)))
-        screen.blit(subtitle, subtitle.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 25)))
-        screen.blit(hint, hint.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 52)))
+        screen.blit(title, title.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 34)))
+        screen.blit(message, message.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 4)))
+        screen.blit(subtitle, subtitle.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 46)))
+        screen.blit(hint, hint.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 73)))
 
     def draw_upgrade_menu(self, screen: pygame.Surface, upgrade_options: list[tuple[str, str, str]]) -> None:
-        """Menu de upgrade com hover e suporte a clique."""
+        """Desenha o menu de upgrade com hover e suporte a clique."""
         overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 190))
         screen.blit(overlay, (0, 0))

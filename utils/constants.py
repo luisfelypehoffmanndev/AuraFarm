@@ -1,6 +1,4 @@
-"""Constantes centralizadas de resolucao, balanceamento e cores do jogo."""
-
-TITLE = "Aura Farming MVP"
+TITLE = "Aura Farming"
 WIDTH = 1280
 HEIGHT = 720
 FPS = 60

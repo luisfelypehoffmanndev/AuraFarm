@@ -1,4 +1,4 @@
-"""Classe base para objetos com posicao, vida e rotinas de update/draw."""
+"""Abstracao base para entidades com posicao, vida e ciclo de simulacao."""
 
 from __future__ import annotations
 
@@ -8,9 +8,15 @@ import pygame
 
 
 class Entity(ABC):
-    """Abstracao compartilhada entre player, boss e inimigos auxiliares."""
+    """Abstracao compartilhada entre player, boss e inimigos auxiliares.
+
+    A classe nao conhece regras de gameplay especificas. Ela apenas oferece a
+    estrutura minima comum: hitbox retangular, pontos de vida e contratos de
+    update/draw para as subclasses.
+    """
 
     def __init__(self, x: float, y: float, width: int, height: int, max_hp: int) -> None:
+        """Inicializa rect e reservas basicas de vida da entidade."""
         self.rect = pygame.Rect(x, y, width, height)
         self.max_hp = max_hp
         self.hp = max_hp

@@ -7,6 +7,7 @@ class Dash(Skill):
     """Representa o dash horizontal usado para reposicionamento."""
 
     def __init__(self) -> None:
+        """Inicializa cooldown, distancia e direcao horizontal padrao."""
         super().__init__(cooldown=1.2)
         self.distance = 90
         self.last_direction = 1

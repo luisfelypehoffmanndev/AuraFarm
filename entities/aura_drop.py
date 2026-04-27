@@ -11,6 +11,7 @@ class AuraDrop:
     """Orb de aura que cai no chao, pode ser coletado e expira com o tempo."""
 
     def __init__(self, x: int, y: int, value: int) -> None:
+        """Inicializa o drop com impulso inicial para cima e tempo de vida."""
         self.rect = pygame.Rect(x - 10, y - 10, 20, 20)
         self.position = pygame.Vector2(self.rect.x, self.rect.y)
         self.velocity = pygame.Vector2(0, -180)
@@ -33,7 +34,7 @@ class AuraDrop:
             self.velocity.y = 0
 
     def draw(self, screen: pygame.Surface) -> None:
-        """Desenha o orb com um pequeno brilho e fade perto do fim."""
+        """Desenha o orb com brilho e fade perto do fim da vida util."""
         alpha = 255 if self.time_left > 1.0 else int(255 * max(0.25, self.time_left))
         glow = pygame.Surface((34, 34), pygame.SRCALPHA)
         pygame.draw.circle(glow, (AURA_DROP_COLOR[0], AURA_DROP_COLOR[1], AURA_DROP_COLOR[2], alpha // 3), (17, 17), 16)

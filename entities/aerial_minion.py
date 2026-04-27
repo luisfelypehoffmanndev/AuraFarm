@@ -27,6 +27,7 @@ class AerialMinion(Entity):
     SPRITE_DRAW_SIZE = (56, 56)
 
     def __init__(self, x: float, y: float, phase: int) -> None:
+        """Inicializa ancora, oscilacao, dano e animacao do minion."""
         super().__init__(x, y, 42, 42, max_hp=1)
         self.anchor_x = x
         self.anchor_y = y
@@ -41,7 +42,11 @@ class AerialMinion(Entity):
         self.sprite_frames = self._load_sprite_frames()
 
     def update(self, dt: float, *args) -> None:
-        """Oscila no ar e prepara o proximo disparo."""
+        """Oscila no ar e prepara o proximo disparo.
+
+        O minion nao persegue o player diretamente. Ele orbita um ponto ancora,
+        produzindo pressao secundaria sem exigir IA de navegacao.
+        """
         self.time += dt
         self.attack_timer = max(0.0, self.attack_timer - dt)
         self._update_animation(dt)
