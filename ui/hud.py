@@ -31,6 +31,7 @@ class Hud:
         player: Player,
         boss: Boss,
         survival_time: float,
+        total_aura_collected: int,
         state: str,
         upgrade_options: list[tuple[str, str, str]],
         dt: float,
@@ -44,7 +45,7 @@ class Hud:
             self.draw_upgrade_menu(screen, upgrade_options)
 
         if state == "game_over":
-            self.draw_game_over(screen, survival_time)
+            self.draw_game_over(screen, survival_time, total_aura_collected)
 
     def update_animated_values(self, player: Player, boss: Boss, dt: float) -> None:
         """Interpola valores exibidos para evitar saltos secos nas barras.
@@ -189,7 +190,7 @@ class Hud:
             highlight = tuple(min(255, channel + 35) for channel in color)
             pygame.draw.rect(screen, highlight, (x + 1, y + 1, highlight_width, 2))
 
-    def draw_game_over(self, screen: pygame.Surface, survival_time: float) -> None:
+    def draw_game_over(self, screen: pygame.Surface, survival_time: float, total_aura_collected: int) -> None:
         """Overlay simples de fim de jogo."""
         overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 170))
@@ -198,12 +199,14 @@ class Hud:
         title = self.small_font.render("Game Over", True, WHITE)
         message = self.large_font.render("Nao sobrou nada...", True, RED)
         subtitle = self.small_font.render(f"Sobreviveu por {survival_time:05.1f}s", True, WHITE)
+        aura_text = self.small_font.render(f"Aura coletada: {total_aura_collected}", True, (120, 190, 255))
         hint = self.small_font.render("Pressione R para reiniciar", True, WHITE)
 
         screen.blit(title, title.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 34)))
         screen.blit(message, message.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 4)))
         screen.blit(subtitle, subtitle.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 46)))
-        screen.blit(hint, hint.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 73)))
+        screen.blit(aura_text, aura_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 72)))
+        screen.blit(hint, hint.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 100)))
 
     def draw_upgrade_menu(self, screen: pygame.Surface, upgrade_options: list[tuple[str, str, str]]) -> None:
         """Desenha o menu de upgrade com hover e suporte a clique."""

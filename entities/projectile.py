@@ -18,6 +18,7 @@ class Projectile:
     """
 
     _animation_cache: dict[tuple[str, str, str | None, int, tuple[int, int] | None], list[pygame.Surface]] = {}
+    _surface_cache: dict[str, pygame.Surface] = {}
 
     def __init__(
         self,
@@ -35,6 +36,7 @@ class Projectile:
         sprite_frame_count: int = 1,
         sprite_size: tuple[int, int] | None = None,
         animation_fps: float = 12.0,
+        custom_surface: pygame.Surface | None = None,
     ) -> None:
         """Inicializa o projetil e calcula seu vetor de movimento."""
         self.rect = pygame.Rect(x, y, size[0], size[1])
@@ -43,13 +45,16 @@ class Projectile:
         self.color = color
         self.animation_time = 0.0
         self.animation_fps = animation_fps
-        self.frames = self.load_frames(
-            sprite_folder,
-            sprite_prefix,
-            sprite_sheet_path,
-            sprite_frame_count,
-            sprite_size,
-        )
+        if custom_surface is not None:
+            self.frames = [self._normalize_frame(custom_surface)]
+        else:
+            self.frames = self.load_frames(
+                sprite_folder,
+                sprite_prefix,
+                sprite_sheet_path,
+                sprite_frame_count,
+                sprite_size,
+            )
 
         direction = pygame.Vector2(target_x - x, target_y - y)
         if direction.length_squared() == 0:

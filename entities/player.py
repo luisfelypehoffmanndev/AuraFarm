@@ -30,8 +30,13 @@ class Player(Entity):
     """
 
     SPRITE_SHEET_PATH = Path(__file__).resolve().parent.parent / "assets" / "player" / "knight_spritesheet.png"
+    WEAPON_SHEET_PATH = Path(__file__).resolve().parent.parent / "assets" / "player" / "crossbow_sheet.png"
     SPRITE_CELL_SIZE = 64
     SPRITE_RENDER_SIZE = (96, 96)
+    WEAPON_CELL_SIZE = 16
+    WEAPON_FRAME_COUNT = 6
+    WEAPON_RENDER_SIZE = (52, 28)
+    WEAPON_ANIMATION_FPS = 20.0
     DASH_ANIMATION_DURATION = 0.18
     SPRITE_ROWS = {
         "idle": (0, 4, 5.0),
@@ -41,6 +46,8 @@ class Player(Entity):
         "dash": (4, 6, 14.0),
     }
     _sprite_frames: dict[str, list[pygame.Surface]] | None = None
+    _weapon_frames: list[pygame.Surface] | None = None
+    _dart_surface: pygame.Surface | None = None
 
     def __init__(self, x: float, y: float) -> None:
         """Inicializa atributos de mobilidade, recursos e animacao."""
@@ -50,6 +57,7 @@ class Player(Entity):
         self.aura = 0
         self.max_aura = 100
         self.aura_threshold = 100
+        self.total_aura_collected = 0
         self.shot = Shot()
         self.dash = Dash()
         self.shield = Shield()
@@ -58,6 +66,8 @@ class Player(Entity):
         self.facing = 1
         self.move_direction = 0
         self.animation_time = 0.0
+        self.aim_target = pygame.Vector2(self.rect.centerx + 1, self.rect.centery)
+        self.shot_animation_time = 0.0
 
     def update(self, dt: float, keys: pygame.key.ScancodeWrapper) -> None:
         """Aplica movimento, gravidade, cooldowns e timers defensivos.
@@ -108,6 +118,9 @@ class Player(Entity):
         if self.shield.active_timer > 0:
             self.shield.active_timer = max(0.0, self.shield.active_timer - dt)
 
+        if self.shot_animation_time > 0:
+            self.shot_animation_time = max(0.0, self.shot_animation_time - dt)
+
     def draw(self, screen: pygame.Surface) -> None:
         """Desenha o player e o efeito visual do escudo quando ativo."""
         if self.shield.active_timer > 0:
@@ -138,19 +151,39 @@ class Player(Entity):
         draw_rect = sprite.get_rect(midbottom=(self.rect.centerx, self.rect.bottom + 4))
         screen.blit(sprite, draw_rect)
 
+        weapon = self._get_weapon_surface()
+        if weapon is not None:
+            screen.blit(weapon, weapon.get_rect(center=self._get_weapon_anchor()))
+
+    def set_aim_target(self, target_position: tuple[int, int]) -> None:
+        """Atualiza a mira para alinhar personagem e arma ao cursor."""
+        self.aim_target = pygame.Vector2(target_position)
+
     def use_shot(self, target_position: tuple[int, int]) -> Projectile | None:
         """Dispara um projetil na direcao do cursor, se o cooldown permitir."""
         if not self.shot.is_ready():
             return None
 
+        self.set_aim_target(target_position)
+
         self.shot.activate()
-        spawn_x = self.rect.centerx
-        spawn_y = self.rect.centery
-        return Projectile(spawn_x, spawn_y, target_position[0], target_position[1], damage=self.shot.damage)
+        self.shot_animation_time = self.WEAPON_FRAME_COUNT / self.WEAPON_ANIMATION_FPS
+        spawn_x, spawn_y = self._get_weapon_muzzle()
+        return Projectile(
+            spawn_x,
+            spawn_y,
+            target_position[0],
+            target_position[1],
+            damage=self.shot.damage,
+            size=(18, 6),
+            custom_surface=self._get_dart_surface(),
+        )
 
     def gain_aura(self, amount: int) -> None:
         """Acumula aura ate o limite maximo."""
-        self.aura = min(self.max_aura, self.aura + amount)
+        gained_amount = max(0, amount)
+        self.aura = min(self.max_aura, self.aura + gained_amount)
+        self.total_aura_collected += gained_amount
 
     def aura_ready(self) -> bool:
         """Indica quando a barra atingiu o limiar de upgrade."""
@@ -218,6 +251,89 @@ class Player(Entity):
             return "walk"
         return "idle"
 
+    def _get_weapon_surface(self) -> pygame.Surface | None:
+        """Retorna a besta rotacionada na direcao do cursor."""
+        frames = self._get_weapon_frames()
+        if not frames:
+            return None
+
+        if self.shot_animation_time > 0:
+            elapsed = (self.WEAPON_FRAME_COUNT / self.WEAPON_ANIMATION_FPS) - self.shot_animation_time
+            frame_index = min(len(frames) - 1, int(elapsed * self.WEAPON_ANIMATION_FPS))
+        else:
+            frame_index = 0
+
+        weapon = frames[frame_index]
+        aim_direction = self._get_aim_direction()
+        angle = math.degrees(math.atan2(-aim_direction.y, aim_direction.x))
+        if self.facing < 0:
+            weapon = pygame.transform.flip(weapon, True, False)
+            angle -= 180
+        weapon = pygame.transform.rotate(weapon, angle)
+
+        if self.invulnerability_timer > 0:
+            weapon = weapon.copy()
+            weapon.fill((255, 255, 255, 120), special_flags=pygame.BLEND_RGBA_ADD)
+
+        return weapon
+
+    def _get_weapon_anchor(self) -> tuple[int, int]:
+        """Posiciona a besta proxima da mao frontal do cavaleiro."""
+        aim_direction = self._get_aim_direction()
+        side_offset = 28 * self.facing
+        return (
+            int(self.rect.centerx + side_offset + (aim_direction.x * 6)),
+            int(self.rect.centery - 12 + (aim_direction.y * 8)),
+        )
+
+    def _get_weapon_muzzle(self) -> tuple[int, int]:
+        """Usa a ponta da besta como origem visual do disparo."""
+        anchor_x, anchor_y = self._get_weapon_anchor()
+        aim_direction = self._get_aim_direction()
+        return (
+            int(anchor_x + (aim_direction.x * 26)),
+            int(anchor_y + (aim_direction.y * 12)),
+        )
+
+    def _get_aim_direction(self) -> pygame.Vector2:
+        """Normaliza a direcao da mira para reaproveitar no desenho e disparo."""
+        direction = self.aim_target - pygame.Vector2(self.rect.centerx, self.rect.centery - 10)
+        if direction.length_squared() == 0:
+            return pygame.Vector2(float(self.facing), 0.0)
+        return direction.normalize()
+
+    @classmethod
+    def _get_dart_surface(cls) -> pygame.Surface:
+        """Cria um dardo reto em pixel art para o tiro da besta."""
+        if cls._dart_surface is not None:
+            return cls._dart_surface
+
+        dart = pygame.Surface((18, 6), pygame.SRCALPHA)
+
+        # Ponta metalica
+        dart.set_at((16, 2), (225, 230, 235))
+        dart.set_at((17, 2), (245, 248, 250))
+        dart.set_at((15, 1), (205, 210, 215))
+        dart.set_at((15, 3), (205, 210, 215))
+
+        # Corpo do virote
+        for x in range(3, 16):
+            dart.set_at((x, 2), (132, 92, 58))
+        for x in range(4, 14):
+            dart.set_at((x, 1), (168, 124, 82))
+        for x in range(4, 14):
+            dart.set_at((x, 3), (96, 64, 40))
+
+        # Pena traseira
+        dart.set_at((0, 1), (180, 40, 40))
+        dart.set_at((1, 2), (210, 72, 72))
+        dart.set_at((0, 3), (180, 40, 40))
+        dart.set_at((2, 1), (130, 24, 24))
+        dart.set_at((2, 3), (130, 24, 24))
+
+        cls._dart_surface = dart
+        return cls._dart_surface
+
     @classmethod
     def _get_sprite_frames(cls) -> dict[str, list[pygame.Surface]]:
         """Carrega e fatia a spritesheet do player uma unica vez.
@@ -251,3 +367,30 @@ class Player(Entity):
 
         cls._sprite_frames = frames
         return cls._sprite_frames
+
+    @classmethod
+    def _get_weapon_frames(cls) -> list[pygame.Surface]:
+        """Carrega os frames da besta uma unica vez."""
+        if cls._weapon_frames is not None:
+            return cls._weapon_frames
+
+        if not cls.WEAPON_SHEET_PATH.exists():
+            cls._weapon_frames = []
+            return cls._weapon_frames
+
+        sheet = pygame.image.load(str(cls.WEAPON_SHEET_PATH)).convert_alpha()
+        frames: list[pygame.Surface] = []
+
+        for index in range(cls.WEAPON_FRAME_COUNT):
+            frame = pygame.Surface((cls.WEAPON_CELL_SIZE, cls.WEAPON_CELL_SIZE), pygame.SRCALPHA)
+            area = pygame.Rect(
+                index * cls.WEAPON_CELL_SIZE,
+                0,
+                cls.WEAPON_CELL_SIZE,
+                cls.WEAPON_CELL_SIZE,
+            )
+            frame.blit(sheet, (0, 0), area)
+            frames.append(pygame.transform.scale(frame, cls.WEAPON_RENDER_SIZE))
+
+        cls._weapon_frames = frames
+        return cls._weapon_frames

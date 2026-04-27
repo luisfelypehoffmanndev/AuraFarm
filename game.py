@@ -148,6 +148,7 @@ class Game:
     def update(self, dt: float) -> None:
         """Atualiza entidades, timers globais e transicoes da partida."""
         keys = pygame.key.get_pressed()
+        self.player.set_aim_target(pygame.mouse.get_pos())
         self.player.update(dt, keys)
         self.boss.update(dt, self.player)
         self.update_combat(dt)
@@ -249,5 +250,14 @@ class Game:
         for minion in self.ground_minions:
             minion.draw(self.screen)
 
-        self.hud.draw(self.screen, self.player, self.boss, self.survival_time, self.state, self.upgrade_options, dt)
+        self.hud.draw(
+            self.screen,
+            self.player,
+            self.boss,
+            self.survival_time,
+            self.player.total_aura_collected,
+            self.state,
+            self.upgrade_options,
+            dt,
+        )
         pygame.display.flip()
