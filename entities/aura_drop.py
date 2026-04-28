@@ -22,7 +22,6 @@ class AuraDrop:
         """Aplica gravidade e reduz o tempo de vida do coletavel."""
         self.time_left = max(0.0, self.time_left - dt)
 
-        # A aura "cai" do boss e repousa no chao para o player decidir se coleta ou nao.
         self.velocity.y += AURA_DROP_GRAVITY * dt
         self.position += self.velocity * dt
         self.rect.x = int(self.position.x)

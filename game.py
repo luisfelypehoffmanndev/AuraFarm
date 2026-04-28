@@ -1,13 +1,3 @@
-"""Loop principal e orquestracao dos sistemas de gameplay do Aura Farming.
-
-Este modulo funciona como coordenador da partida. Ele concentra:
-- inicializacao do Pygame e da janela;
-- maquina de estados da run;
-- listas de entidades temporarias;
-- regras de spawn, colisao e progressao;
-- ordem de update e draw de cada frame.
-"""
-
 from pathlib import Path
 
 import pygame
@@ -70,7 +60,6 @@ class Game:
         """
         self.state = "running"
         self.player = Player(120, GROUND_Y - 80)
-        # O boss fica no centro para reforcar que ele e o foco da arena.
         self.boss = Boss((WIDTH // 2) - 45, 110)
         self.projectiles: list[Projectile] = []
         self.enemy_projectiles: list[Projectile] = []
@@ -115,8 +104,6 @@ class Game:
                 continue
 
             if event.type == pygame.MOUSEBUTTONDOWN and self.state == "running":
-                # Botao esquerdo dispara; botao direito ativa o recurso
-                # defensivo sem interromper o movimento.
                 if event.button == 1:
                     self.spawn_player_projectile(event.pos)
 
@@ -124,7 +111,6 @@ class Game:
                     self.player.use_shield()
 
             if event.type == pygame.KEYDOWN and self.state == "running":
-                # O dash fica num atalho separado para nao competir com o pulo.
                 if event.key in (pygame.K_LSHIFT, pygame.K_RSHIFT):
                     self.player.use_dash()
 
@@ -160,7 +146,6 @@ class Game:
         if self.player.aura_ready():
             self.state = "upgrade"
 
-        # O escalonamento temporal complementa a progressao por fase do boss.
         if self.scale_timer >= 12:
             self.boss.scale_up()
             self.scale_timer = 0.0

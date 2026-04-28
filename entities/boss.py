@@ -89,8 +89,6 @@ class Boss(Entity):
         self.attack_timer = max(0.0, self.attack_timer - dt)
         self.ult_timer = max(0.0, self.ult_timer - dt)
         self.minion_spawn_timer = max(0.0, self.minion_spawn_timer - dt)
-        # O movimento oscilante faz o boss ocupar mais espaco visual sem exigir
-        # uma IA espacial complexa.
         self.rect.x = int(self.float_origin_x + math.sin(self.float_time * BOSS_MOVE_SPEED) * BOSS_MOVE_RANGE)
         self.rect.y = int(self.float_origin_y + math.sin(self.float_time * 2) * 18)
 
@@ -125,7 +123,6 @@ class Boss(Entity):
         if self.attack_timer > self.telegraph_window:
             return
 
-        # Avisa o disparo sem complicar a IA: linha e anel mais fortes perto do tiro.
         ratio = 1.0 - (self.attack_timer / self.telegraph_window if self.telegraph_window else 0.0)
         alpha = int(70 + 120 * ratio)
         radius = int(56 + 10 * ratio)
@@ -144,7 +141,6 @@ class Boss(Entity):
         if self.heal_pause_timer > 0:
             return 0
 
-        # O HP mostrado esvazia normalmente, mas a luta continua em nova fase.
         dealt = super().take_damage(amount)
         if self._is_immortal and self.hp <= 0:
             self.advance_phase()
@@ -162,7 +158,6 @@ class Boss(Entity):
         if self.attack_timer > 0:
             return None
 
-        # Mirar no centro do player torna o ataque justo e legivel.
         self.attack_timer = self.attack_cooldown
         return Projectile(
             self.rect.centerx,
@@ -239,7 +234,6 @@ class Boss(Entity):
 
     def _target_burst(self, player: Entity) -> list[UltStrike]:
         """Cria uma ULT focada na posicao atual do player."""
-        # ULT 1: pressiona a posicao do player com colunas laterais para punir movimento curto.
         strikes: list[UltStrike] = []
         for offset in (-150, 0, 150):
             x = max(60, min(WIDTH - 60, player.rect.centerx + offset))
@@ -248,7 +242,6 @@ class Boss(Entity):
 
     def _arena_lanes(self) -> list[UltStrike]:
         """Cria uma ULT de lanes fixas distribuida pela arena."""
-        # ULT 2: fecha lanes fixas da arena inteira. E forte, mas previsivel.
         strikes: list[UltStrike] = []
         for ratio in (0.14, 0.30, 0.46, 0.62, 0.78, 0.90):
             strikes.append(UltStrike(int(WIDTH * ratio), 38, self.ult_damage))
@@ -256,7 +249,6 @@ class Boss(Entity):
 
     def _crusher_pattern(self, player: Entity) -> list[UltStrike]:
         """Cria uma ULT mais densa comprimindo o espaco do player."""
-        # ULT 3: fecha o espaco em torno do player com uma parede mais densa.
         strikes: list[UltStrike] = []
         for offset in (-240, -120, 0, 120, 240):
             x = max(50, min(WIDTH - 50, player.rect.centerx + offset))
@@ -270,7 +262,6 @@ class Boss(Entity):
 
     def advance_phase(self) -> None:
         """Aplica o escalonamento forte de uma nova fase do boss."""
-        # Cada "morte" deixa o boss um pouco mais resistente e agressivo.
         self.phase += 1
         self.max_hp += 34
         self.projectile_damage += 2

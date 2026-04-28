@@ -84,8 +84,6 @@ class Projectile:
         frames: list[pygame.Surface] = []
 
         if sprite_sheet_path is not None:
-            # Caminho usado quando o asset ja foi consolidado em uma spritesheet
-            # horizontal unica.
             sheet = pygame.image.load(sprite_sheet_path).convert_alpha()
             frame_width = sheet.get_width() // max(1, sprite_frame_count)
             frame_height = sheet.get_height()
@@ -98,8 +96,6 @@ class Projectile:
                     frame = pygame.transform.scale(frame, sprite_size)
                 frames.append(frame)
         else:
-            # Fallback para sequencias de PNGs individuais. Se houver variante
-            # 4x, ela tem prioridade por oferecer mais definicao.
             folder = Path(sprite_folder)
             frame_paths = sorted(folder.glob(f"{sprite_prefix}_*_4x.png"))
             if not frame_paths:

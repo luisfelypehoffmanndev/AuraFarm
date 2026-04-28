@@ -37,6 +37,7 @@ class Player(Entity):
     WEAPON_FRAME_COUNT = 6
     WEAPON_RENDER_SIZE = (52, 28)
     WEAPON_ANIMATION_FPS = 20.0
+    DART_RENDER_SIZE = (28, 10)
     DASH_ANIMATION_DURATION = 0.18
     SPRITE_ROWS = {
         "idle": (0, 4, 5.0),
@@ -85,8 +86,6 @@ class Player(Entity):
 
         self.move_direction = direction
         if direction != 0:
-            # A ultima direcao horizontal valida e reaproveitada pelo dash e
-            # tambem define o flip do sprite do personagem.
             self.facing = int(math.copysign(1, direction))
             self.dash.last_direction = self.facing
 
@@ -135,8 +134,6 @@ class Player(Entity):
             pygame.draw.rect(screen, color, self.rect)
             return
 
-        # Cada estado tem sua propria velocidade de animacao para reforcar a
-        # sensacao de peso do personagem.
         _, _, fps = self.SPRITE_ROWS[state]
         frame_index = int(self.animation_time * fps) % len(state_frames)
         sprite = state_frames[frame_index]
@@ -169,13 +166,14 @@ class Player(Entity):
         self.shot.activate()
         self.shot_animation_time = self.WEAPON_FRAME_COUNT / self.WEAPON_ANIMATION_FPS
         spawn_x, spawn_y = self._get_weapon_muzzle()
+        projectile_width, projectile_height = self.DART_RENDER_SIZE
         return Projectile(
-            spawn_x,
-            spawn_y,
+            spawn_x - (projectile_width // 2),
+            spawn_y - (projectile_height // 2),
             target_position[0],
             target_position[1],
             damage=self.shot.damage,
-            size=(18, 6),
+            size=self.DART_RENDER_SIZE,
             custom_surface=self._get_dart_surface(),
         )
 
@@ -310,13 +308,11 @@ class Player(Entity):
 
         dart = pygame.Surface((18, 6), pygame.SRCALPHA)
 
-        # Ponta metalica
         dart.set_at((16, 2), (225, 230, 235))
         dart.set_at((17, 2), (245, 248, 250))
         dart.set_at((15, 1), (205, 210, 215))
         dart.set_at((15, 3), (205, 210, 215))
 
-        # Corpo do virote
         for x in range(3, 16):
             dart.set_at((x, 2), (132, 92, 58))
         for x in range(4, 14):
@@ -324,14 +320,13 @@ class Player(Entity):
         for x in range(4, 14):
             dart.set_at((x, 3), (96, 64, 40))
 
-        # Pena traseira
         dart.set_at((0, 1), (180, 40, 40))
         dart.set_at((1, 2), (210, 72, 72))
         dart.set_at((0, 3), (180, 40, 40))
         dart.set_at((2, 1), (130, 24, 24))
         dart.set_at((2, 3), (130, 24, 24))
 
-        cls._dart_surface = dart
+        cls._dart_surface = pygame.transform.scale(dart, cls.DART_RENDER_SIZE)
         return cls._dart_surface
 
     @classmethod
